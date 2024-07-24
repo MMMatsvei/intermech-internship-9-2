@@ -23,12 +23,17 @@
             throw new ObjectDisposedException(nameof(MemoryUsageMonitor));
         }
 
+        ThreadPool.QueueUserWorkItem(MonitorThread);
+
+    }
+
+    void MonitorThread(Object stateInfo)
+    {
         var token = cancellationTokenSource.Token;
 
         while (!token.IsCancellationRequested)
         {
             double usedMemory = GC.GetTotalMemory(false);
-
             Console.WriteLine($"Использовано {(usedMemory / 1024 / 1024):F2} MB");
 
             if (usedMemory >= 0.5 * criticalBytes)
@@ -74,22 +79,20 @@ class Program
 {
     static void Main()
     {
-        long critical = 50 * 1024 * 1024; 
+        long critical = 50 * 1024 * 1024;
 
         using (MemoryUsageMonitor monitor = new MemoryUsageMonitor(critical))
         {
-            Thread monitorThread = new Thread(() => monitor.Monitor());
-            monitorThread.Start();
+            ThreadPool.QueueUserWorkItem(state => monitor.Monitor());
 
             var largeList = new List<byte[]>();
-            for (int i = 0; i < 10; i++) 
+            for (int i = 0; i < 10; i++)
             {
                 largeList.Add(new byte[10 * 1024 * 1024]);
-                Thread.Sleep(1000); 
+                Thread.Sleep(1000);
             }
 
             monitor.Stop();
-            monitorThread.Join();
         }
     }
 }
